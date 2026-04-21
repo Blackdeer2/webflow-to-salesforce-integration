@@ -40,16 +40,53 @@ global class WebflowWebhookService {
             
             if (webhookEvent?.payload?.data != null) {
                 Map<String, String> formData = webhookEvent.payload.data;
+                String incomingEmail = formData.get('Email');
+
+                // Перевірка на дублікати за Email
+                if (String.isNotBlank(incomingEmail)) {
+                    List<Lead> existingLeads = [SELECT Id FROM Lead WHERE Email = :incomingEmail LIMIT 1];
+                    if (!existingLeads.isEmpty()) {
+                        System.debug(LoggingLevel.INFO, 'Lead with email ' + incomingEmail + ' already exists. Skipping lead creation.');
+                        setResponse(res, 200, 'Lead with this email already exists. No new lead created.');
+                        return;
+                    }
+                }
                 
-                Lead newLead = new Lead(
-                    LastName = String.isNotBlank(formData.get('Name')) ? formData.get('Name') : 'Unknown Webflow Lead',
-                    Company = String.isNotBlank(formData.get('Company/Project')) ? formData.get('Company/Project') : 'Not Provided',
-                    Email = formData.get('Email'),
-                    LeadSource = webhookEvent.payload.name
-                );
+                // Ініціалізація нового Ліда з жорстким джерелом
+                Lead newLead = new Lead(LeadSource = 'Advertisement');
                 
-                if (String.isNotBlank(formData.get('Discussion Topic'))) {
-                    newLead.Description = 'Discussion Topic: ' + formData.get('Discussion Topic');
+                // Отримання правил мапінгу з Custom Metadata
+                // Отримання ТІЛЬКИ АКТИВНИХ правил мапінгу
+                List<Webflow_Field_Mapping__mdt> mappings = [
+                    SELECT Webflow_Field_Name__c, Salesforce_Field_API_Name__c 
+                    FROM Webflow_Field_Mapping__mdt
+                    WHERE Is_Active__c = true
+                ];
+
+                // Динамічне заповнення полів
+                for (Webflow_Field_Mapping__mdt mapping : mappings) {
+                    String webflowKey = mapping.Webflow_Field_Name__c;
+                    String sfApiName = mapping.Salesforce_Field_API_Name__c;
+
+                    if (formData.containsKey(webflowKey) && String.isNotBlank(formData.get(webflowKey))) {
+                        try {
+                            newLead.put(sfApiName, formData.get(webflowKey));
+                        } catch (Exception e) {
+                            System.debug(LoggingLevel.WARN, 'Failed to map field ' + sfApiName + ': ' + e.getMessage());
+                        }
+                    }
+                }
+                
+                // Підстраховка для обов'язкових полів Salesforce (щоб уникнути DML помилок)
+                if (String.isBlank(newLead.LastName)) {
+                    newLead.LastName = 'Unknown Webflow Lead';
+                }
+                if (String.isBlank(newLead.Company)) {
+                    newLead.Company = 'Not Provided';
+                }
+                // Якщо Email не був налаштований у метаданих, але ми маємо його з форми
+                if (String.isBlank(newLead.Email) && String.isNotBlank(incomingEmail)) {
+                    newLead.Email = incomingEmail;
                 }
                 
                 insert newLead;
