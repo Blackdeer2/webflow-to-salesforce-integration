@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>Webflow_Webhook_Secret</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Webflow Webhook Secret</shortDescription>
+        <value>0f0a62fcdd889d590345c562fa1677c0c80ee39e00ef603052bacf06bd0275fd</value>
+    </labels>
+</CustomLabels>
