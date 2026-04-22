@@ -42,7 +42,6 @@ global class WebflowWebhookService {
                 Map<String, String> formData = webhookEvent.payload.data;
                 String incomingEmail = formData.get('Email');
 
-                // Перевірка на дублікати за Email
                 if (String.isNotBlank(incomingEmail)) {
                     List<Lead> existingLeads = [SELECT Id FROM Lead WHERE Email = :incomingEmail LIMIT 1];
                     if (!existingLeads.isEmpty()) {
@@ -52,18 +51,14 @@ global class WebflowWebhookService {
                     }
                 }
                 
-                // Ініціалізація нового Ліда з жорстким джерелом
                 Lead newLead = new Lead(LeadSource = 'Advertisement');
                 
-                // Отримання правил мапінгу з Custom Metadata
-                // Отримання ТІЛЬКИ АКТИВНИХ правил мапінгу
                 List<Webflow_Field_Mapping__mdt> mappings = [
                     SELECT Webflow_Field_Name__c, Salesforce_Field_API_Name__c 
                     FROM Webflow_Field_Mapping__mdt
                     WHERE Is_Active__c = true
                 ];
 
-                // Динамічне заповнення полів
                 for (Webflow_Field_Mapping__mdt mapping : mappings) {
                     String webflowKey = mapping.Webflow_Field_Name__c;
                     String sfApiName = mapping.Salesforce_Field_API_Name__c;
@@ -77,14 +72,12 @@ global class WebflowWebhookService {
                     }
                 }
                 
-                // Підстраховка для обов'язкових полів Salesforce (щоб уникнути DML помилок)
                 if (String.isBlank(newLead.LastName)) {
                     newLead.LastName = 'Unknown Webflow Lead';
                 }
                 if (String.isBlank(newLead.Company)) {
                     newLead.Company = 'Not Provided';
                 }
-                // Якщо Email не був налаштований у метаданих, але ми маємо його з форми
                 if (String.isBlank(newLead.Email) && String.isNotBlank(incomingEmail)) {
                     newLead.Email = incomingEmail;
                 }
